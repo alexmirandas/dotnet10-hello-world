@@ -1,0 +1,21 @@
+trigger:
+  branches:
+    include:
+      - main
+      - develop
+
+pr:
+  branches:
+    include:
+      - '*'
+
+stages:
+  - template: azure-devops/templates/build-api.yml
+
+  - template: azure-devops/templates/security-scan.yml
+
+  - template: azure-devops/templates/docker-build.yml
+
+  - template: azure-devops/templates/terraform-security.yml
+
+  - template: azure-devops/templates/deploy.yml
