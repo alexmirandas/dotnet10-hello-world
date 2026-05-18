@@ -1,3 +1,5 @@
+# azure-pipelines.yml
+
 trigger:
   branches:
     include:
@@ -9,13 +11,47 @@ pr:
     include:
       - '*'
 
-stages:
-  - template: azure-devops/templates/build-api.yml
+pool:
+  vmImage: ubuntu-latest
 
-  - template: azure-devops/templates/security-scan.yml
+variables:
+  buildConfiguration: Release
 
-  - template: azure-devops/templates/docker-build.yml
+steps:
 
-  - template: azure-devops/templates/terraform-security.yml
+# Install .NET 10 SDK
+- task: UseDotNet@2
+  displayName: 'Install .NET 10 SDK'
+  inputs:
+    packageType: 'sdk'
+    version: '10.x'
 
-  - template: azure-devops/templates/deploy.yml
+# Restore dependencies
+- script: |
+    dotnet restore
+  displayName: 'Restore Packages'
+
+# Build application
+- script: |
+    dotnet build --configuration $(buildConfiguration) --no-restore
+  displayName: 'Build Application'
+
+# Run unit tests
+- script: |
+    dotnet test --configuration $(buildConfiguration) --no-build --verbosity normal
+  displayName: 'Run Unit Tests'
+
+# Publish API
+- script: |
+    dotnet publish src/HelloWorld.Api/HelloWorld.Api.csproj \
+      --configuration $(buildConfiguration) \
+      --output $(Build.ArtifactStagingDirectory)
+  displayName: 'Publish Application'
+
+# Publish pipeline artifact
+- task: PublishBuildArtifacts@1
+  displayName: 'Publish Build Artifact'
+  inputs:
+    PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+    ArtifactName: 'hello-world-api'
+    publishLocation: 'Container'
