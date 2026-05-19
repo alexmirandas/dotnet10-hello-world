@@ -42,10 +42,9 @@ steps:
 
 # Run unit tests
 - script: |
-    dotnet test $(testPath) \
-      --configuration $(buildConfiguration) \
-      --verbosity normal
-  displayName: 'Run Unit Tests'
+    dotnet test tests/HelloWorld.Api.Tests/HelloWorld.Api.Tests.csproj \
+      --configuration $(buildConfiguration)
+  displayName: 'Unit Tests'
 
 # Publish application
 - script: |
