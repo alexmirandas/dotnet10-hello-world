@@ -12,10 +12,12 @@ pr:
       - '*'
 
 pool:
-  vmImage: ubuntu-latest
+  vmImage: 'ubuntu-latest'
 
 variables:
-  buildConfiguration: Release
+  buildConfiguration: 'Release'
+  projectPath: 'src/HelloWorld.Api/HelloWorld.Api.csproj'
+  testPath: 'tests/HelloWorld.Api.Tests'
 
 steps:
 
@@ -28,27 +30,31 @@ steps:
 
 # Restore dependencies
 - script: |
-    dotnet restore
+    dotnet restore $(projectPath)
   displayName: 'Restore Packages'
 
 # Build application
 - script: |
-    dotnet build --configuration $(buildConfiguration) --no-restore
+    dotnet build $(projectPath) \
+      --configuration $(buildConfiguration) \
+      --no-restore
   displayName: 'Build Application'
 
 # Run unit tests
 - script: |
-    dotnet test --configuration $(buildConfiguration) --no-build --verbosity normal
+    dotnet test $(testPath) \
+      --configuration $(buildConfiguration) \
+      --verbosity normal
   displayName: 'Run Unit Tests'
 
-# Publish API
+# Publish application
 - script: |
-    dotnet publish src/HelloWorld.Api/HelloWorld.Api.csproj \
+    dotnet publish $(projectPath) \
       --configuration $(buildConfiguration) \
       --output $(Build.ArtifactStagingDirectory)
   displayName: 'Publish Application'
 
-# Publish pipeline artifact
+# Publish artifact
 - task: PublishBuildArtifacts@1
   displayName: 'Publish Build Artifact'
   inputs:
