@@ -1,0 +1,90 @@
+name: Push to Azure Repos and Create PR
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout GitHub code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Push to Azure DevOps Repo
+        env:
+          AZURE_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          AZURE_REPO_URL: ${{ secrets.AZURE_REPO_URL }}
+          # Format: https://dev.azure.com/YourOrg/YourProject/_git/YourRepo
+        run: |
+          git config --global user.email "actions@github.com"
+          git config --global user.name "GitHub Actions"
+
+          git remote add azure https://x-token-auth:$AZURE_PAT@${AZURE_REPO_URL#https://}
+          git push azure main --force
+
+      - name: Create PR in Azure DevOps (main → develop)
+        env:
+          AZURE_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+          ADO_ORG: ${{ secrets.ADO_ORG }}
+          ADO_PROJECT: ${{ secrets.ADO_PROJECT }}
+          ADO_REPO: ${{ secrets.ADO_REPO }}
+        run: |
+          COMMIT_MSG=$(git log -1 --pretty=%s)
+
+          PAYLOAD=$(jq -n \
+            --arg title  "[GitHub → ADO] ${COMMIT_MSG}" \
+            --arg source "refs/heads/main" \
+            --arg target "refs/heads/develop" \
+            '{ title: $title, sourceRefName: $source, targetRefName: $target, isDraft: false }')
+
+          HTTP_STATUS=$(curl -s -o /tmp/ado_pr.json -w "%{http_code}" \
+            -X POST "https://dev.azure.com/${ADO_ORG}/${ADO_PROJECT}/_apis/git/repositories/${ADO_REPO}/pullrequests?api-version=7.1" \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Basic $(echo -n ":${AZURE_PAT}" | base64)" \
+            -d "$PAYLOAD")
+
+          if [[ "$HTTP_STATUS" == "201" ]]; then
+            PR_URL=$(jq -r '._links.web.href' /tmp/ado_pr.json)
+            echo "✅ PR created: $PR_URL"
+          elif [[ "$HTTP_STATUS" == "409" ]]; then
+            echo "ℹ️ PR already exists, skipping."
+          else
+            echo "❌ Error HTTP $HTTP_STATUS"
+            cat /tmp/ado_pr.json
+            exit 1
+          fi
+
+# name: Push to Azure Repos
+
+# on:
+#   push:
+#     branches:
+#       - main  # Trigger on pushes to the main branch
+
+# jobs:
+#   sync:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - name: Checkout GitHub code
+#         uses: actions/checkout@v4
+#         with:
+#           fetch-depth: 0 # Fetch all history for all branches and tags
+
+#       - name: Push to Azure DevOps Repo
+#         env:
+#           AZURE_PAT: ${{ secrets.AZURE_DEVOPS_PAT }}
+#           # Format: https://<ORG_NAME>@://azure.com<ORG_NAME>/<PROJECT>/_git/<REPO>
+#           AZURE_REPO_URL: "https://://azure.comYourOrg/YourProject/_git/YourRepo"
+#         run: |
+#           # Configure Git user for the push
+#           git config --global user.email "actions@github.com"
+#           git config --global user.name "GitHub Actions"
+          
+#           # Add the Azure Repo as a remote and push
+#           # Using the PAT for authentication in the URL
+#           git remote add azure https://x-token-auth:$AZURE_PAT@${AZURE_REPO_URL#https://}
+#           git push azure main --force
