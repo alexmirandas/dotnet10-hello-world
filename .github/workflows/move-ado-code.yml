@@ -27,7 +27,7 @@ jobs:
           git rm --cached -r .github/
 
           git remote add azure https://x-token-auth:$AZURE_PAT@${AZURE_REPO_URL#https://}
-          git push azure develop --force
+          git push azure main:develop --force
 
       # - name: Create PR in Azure DevOps
       #   env:
